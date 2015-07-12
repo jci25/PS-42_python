@@ -1,5 +1,5 @@
 import subprocess
-mav_txt = subprocess.check_output("tail -n 20 ~/tmp.out", shell=True)
+mav_txt = subprocess.check_output("tail -n 40 /home/pi/tmp.out", shell=True)
 mav_txt = mav_txt.split("\n")
 battery = -99
 heading = -99

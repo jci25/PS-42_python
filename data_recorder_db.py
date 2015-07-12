@@ -1,4 +1,5 @@
 from socketIO_client import SocketIO, BaseNamespace
+from tinydb import TinyDB, where
 import threading, time, urllib, base64, json, datetime
 img = ""
 batt = 0
@@ -12,9 +13,9 @@ humid = 0
 hullTemp = 0
 timestamp = time.time()
 t=datetime.datetime.fromtimestamp(timestamp)
-data_file=t.strftime('/home/pi/record_data/%Y-%m-%d-%s.json')
-json_str= '{"run_start": "'+str(timestamp)+'",  "data":[]}'
-json_var = json.loads(json_str)
+table_name=t.strftime('%Y-%m-%d-%s')
+db = TinyDB("/home/pi/record_data/tinydb.json")
+table = db.table(table_name)
 
 class Namespace(BaseNamespace):
 
@@ -22,8 +23,8 @@ class Namespace(BaseNamespace):
         print('[Connected]')
 	
 def update_json():
-    global batt, head, roll, pitch, yaw, timestamp, img, waterTemp, depth, humid, hullTemp
-    json_var['data'].append({"timestamp":timestamp, "image":img, "battery":batt, "heading":head, "roll":roll, "pitch":pitch, "yaw":yaw, "watertemp":waterTemp, "depth":depth, "humidity": humid, "hulltemp":hullTemp})
+    global table, batt, head, roll, pitch, yaw, timestamp, img, waterTemp, depth, humid, hullTemp
+    table.insert({"timestamp":timestamp, "image":img, "battery":batt, "heading":head, "roll":roll, "pitch":pitch, "yaw":yaw, "watertemp":waterTemp, "depth":depth, "humidity": humid, "hulltemp":hullTemp})
 
 def on_arduino(*args):
     global waterTemp, depth, humid, hullTemp, timestamp
@@ -62,19 +63,35 @@ def on_mav(*args):
 		yaw = item[1].split("\n")
 		yaw = yaw[0]
     update_json()
+    
+def get_tables(*args):
+    global db, socketIO
+    print "get tables"
+    all_tables = db.tables()
+    json_tables = json.dumps(list(all_tables))
+    socketIO.emit('table_names', json_tables)
+    print "table names sent"
+    
+def get_table_data(*args):
+    global db, socketIO
+    table_of_interest = str(args[0])
+    db_table = db.table(table_of_interest)
+    json_table = json.dumps(db_table.all())
+    socketIO.emit('table_of_interest', json_table)
 		
 def record():
     # do something here ...
     # call f() again in 60 seconds
-    with open(data_file, 'w') as f:
-	json.dump(json_var, f, ensure_ascii=False)
-    threading.Timer(10, record).start()
+#    with open(data_file, 'w') as f:
+#	json.dump(json_var, f, ensure_ascii=False)
+#    threading.Timer(10, record).start()
+	print "NOOO"
     
-record()
 
 socketIO = SocketIO('localhost', 8888, Namespace)
 socketIO.on('arduino', on_arduino)
 socketIO.on('mav', on_mav)
+socketIO.on('getTables', get_tables)
+socketIO.on('getTableData', get_table_data)
+
 socketIO.wait()
-
-
